@@ -62,7 +62,7 @@ python run_trading.py
 - [x] **Execution**: Interface for Zerodha Kite and Upstox with order placement logic.
 - [x] **Strategy**: Real-time ticker processing and signal generation.
 
-![dashboard](prostockdashboard.png)
+![ProStock dashboard](prostock-dashboard.png)
 
 ## Future Roadmap
 
