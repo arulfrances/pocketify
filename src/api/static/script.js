@@ -1,6 +1,6 @@
 // Prostock Dashboard Logic
-
 const API_BASE = '/api';
+let currentSymbol = 'NIFTY 50';
 
 // Initialize Chart
 function initChart() {
@@ -32,8 +32,10 @@ function initChart() {
 // Fetch and Update Signals
 async function updateSignals() {
     try {
-        const response = await fetch(`${API_BASE}/predictions`);
+        const response = await fetch(`${API_BASE}/predictions?symbol=${currentSymbol}`);
         const data = await response.json();
+
+        if (data.status === "error") return;
 
         const tbody = document.querySelector('#signals-table tbody');
         tbody.innerHTML = `
@@ -49,7 +51,9 @@ async function updateSignals() {
 
         // Update hero prediction
         document.getElementById('ai-signal').textContent = data.signal === 'BUY' ? 'BULLISH' : 'BEARISH';
-        document.getElementById('ai-signal').parentElement.style.background = data.signal === 'BUY' ? 'linear-gradient(135deg, #22c55e, #10b981)' : 'linear-gradient(135deg, #ef4444, #f43f5e)';
+        const aiCard = document.getElementById('ai-signal').parentElement;
+        aiCard.style.background = data.signal === 'BUY' ? 'linear-gradient(135deg, #22c55e, #10b981)' : 'linear-gradient(135deg, #ef4444, #f43f5e)';
+        aiCard.querySelector('.metric-change').textContent = `Target: ${currentSymbol}`;
     } catch (e) {
         console.error("Error fetching signals", e);
     }
@@ -157,10 +161,23 @@ async function handleSearch(query) {
     try {
         const response = await fetch(`${API_BASE}/search?query=${query}`);
         const result = await response.json();
+
         if (result.results && result.results.length > 0) {
-            // In a real app, this might switch the chart view
-            console.log(`Found symbol: ${result.results[0]}`);
-            alert(`Focusing on ${result.results[0]}`);
+            currentSymbol = result.results[0];
+            console.log(`Switched to: ${currentSymbol}`);
+
+            // Clear current chart and re-init
+            Plotly.purge('main-chart');
+            initChart();
+
+            // Immediate updates
+            updateSignals();
+            updateLiveMetrics();
+
+            // Update UI feedback
+            document.querySelector('.chart-header h3').textContent = `${currentSymbol} Real-time Analysis`;
+        } else {
+            alert("No matching symbol found. Try 'NIFTY 50', 'BANKNIFTY', or 'SENSEX'.");
         }
     } catch (e) {
         console.error("Search failed", e);
@@ -293,12 +310,13 @@ async function updateLiveMetrics() {
             }
         }
 
-        // 2. Update Main Chart (using Nifty as default)
-        if (result["NIFTY 50"]) {
+        // 2. Update Main Chart (using active symbol)
+        const symbolData = result[currentSymbol];
+        if (symbolData) {
             const time = new Date();
             Plotly.extendTraces('main-chart', {
                 x: [[time]],
-                y: [[result["NIFTY 50"].price]]
+                y: [[symbolData.price]]
             }, [0]);
         }
 

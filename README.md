@@ -2,6 +2,8 @@
 
 > **⚠️ Study Note & Disclaimer:** This project has been built as a **hobby project** for educational purposes. Trading in financial markets involves significant risk. Use this software with extreme care. Always perform your own research and study before executing trades. The authors are not responsible for any financial losses.
 
+![Prostock Dashboard](prostock-dashboard.png)
+
 Prostock is an AI-powered trading application designed for the Indian market (Nifty 50, Bank Nifty, Sensex). It integrates data ingestion from NSE, feature engineering using technical indicators, ML-based prediction, and a broker-agnostic execution gateway.
 
 ## Project Structure
@@ -50,6 +52,8 @@ powershell
 python run_trading.py
 
 
+
+
 ## Features Implemented
 
 - [x] **Data Ingestion**: Support for `yfinance` and NSE Bhavcopy downloading.
@@ -57,6 +61,8 @@ python run_trading.py
 - [x] **Modeling**: XGBoost Classifier for price direction prediction.
 - [x] **Execution**: Interface for Zerodha Kite and Upstox with order placement logic.
 - [x] **Strategy**: Real-time ticker processing and signal generation.
+
+![dashboard](prostockdashboard.png)
 
 ## Future Roadmap
 
