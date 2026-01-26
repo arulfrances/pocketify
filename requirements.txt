@@ -1,0 +1,19 @@
+pandas
+numpy
+scikit-learn
+xgboost
+requests
+beautifulsoup4
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+python-dotenv
+yfinance
+plotly
+matplotlib
+paytmmoney-python-sdk
+pyotp
+gunicorn
+uvicorn
+# neo-api-client (Install via: pip install neo-api-client)

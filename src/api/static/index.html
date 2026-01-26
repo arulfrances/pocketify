@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prostock AI Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="background-glow"></div>
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <span class="logo-icon">▲</span>
+                <span class="logo-text">PROSTOCK</span>
+            </div>
+            <nav>
+                <ul>
+                    <li class="active"><a href="#"><span class="icon">📈</span> Dashboard</a></li>
+                    <li><a href="#"><span class="icon">💼</span> Portfolio</a></li>
+                    <li><a href="#"><span class="icon">📜</span> Orders</a></li>
+                    <li><a href="#"><span class="icon">🤖</span> AI Models</a></li>
+                    <li><a href="#"><span class="icon">⚙️</span> Settings</a></li>
+                </ul>
+            </nav>
+            <div class="broker-status">
+                <div class="status-indicator online"></div>
+                <div class="status-info">
+                    <p class="status-label">Broker Status</p>
+                    <p class="status-value" id="active-broker-display">Indstocks Connected</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header>
+                <div class="search-bar">
+                    <input type="text" placeholder="Search Symbol (e.g. NIFTY 50)..."
+                        onkeydown="if(event.key==='Enter') handleSearch(this.value)">
+                </div>
+                <div class="user-profile">
+                    <div id="live-clock" class="metric-label"
+                        style="font-size: 14px; font-weight: 600; margin-right: 20px;">00:00:00</div>
+                    <div id="market-status-badge" class="market-status">FETCHING...</div>
+                    <div class="profile-avatar">👤</div>
+                </div>
+            </header>
+
+            <!-- Dashboard View -->
+            <div id="dashboard-view" class="tab-content active">
+                <section class="metrics-grid">
+                    <div class="metric-card">
+                        <p class="metric-label">NIFTY 50</p>
+                        <p class="metric-value">Fetching...</p>
+                        <p class="metric-change positive">LIVE</p>
+                    </div>
+                    <div class="metric-card">
+                        <p class="metric-label">BANK NIFTY</p>
+                        <p class="metric-value">45,120.15</p>
+                        <p class="metric-change positive">+420.25 (0.94%)</p>
+                    </div>
+                    <div class="metric-card">
+                        <p class="metric-label">SENSEX</p>
+                        <p class="metric-value">71,200.45</p>
+                        <p class="metric-change negative">-12.30 (0.02%)</p>
+                    </div>
+                    <div class="metric-card highlight">
+                        <p class="metric-label">AI PREDICTION</p>
+                        <p class="metric-value" id="ai-signal">ANALYZING</p>
+                        <p class="metric-change neutral">Ready</p>
+                    </div>
+                </section>
+
+                <section class="backtest-report glass" id="backtest-section">
+                    <div class="report-header">
+                        <h3>Strategy Backtest Report (Last 1 Year)</h3>
+                        <button class="btn-sm active" onclick="loadBacktest()">Run New Backtest</button>
+                    </div>
+                    <div class="report-grid">
+                        <div class="report-card">
+                            <p class="report-label">STRATEGY RETURN</p>
+                            <p class="report-value" id="bt-strategy-return">--%</p>
+                        </div>
+                        <div class="report-card">
+                            <p class="report-label">MARKET RETURN</p>
+                            <p class="report-value" id="bt-market-return">--%</p>
+                        </div>
+                        <div class="report-card">
+                            <p class="report-label">SHARPE RATIO</p>
+                            <p class="report-value" id="bt-sharpe">--</p>
+                        </div>
+                        <div class="report-card">
+                            <p class="report-label">MAX DRAWDOWN</p>
+                            <p class="report-value" id="bt-drawdown">--%</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="chart-section glass">
+                    <div class="chart-header">
+                        <h3>NIFTY 50 Real-time Analysis</h3>
+                    </div>
+                    <div id="main-chart" style="height: 400px;"></div>
+                </section>
+
+                <div class="bottom-grid">
+                    <section class="data-table-section glass">
+                        <h3>Latest Signals</h3>
+                        <div class="table-container">
+                            <table id="signals-table">
+                                <thead>
+                                    <tr>
+                                        <th>Symbol</th>
+                                        <th>Signal</th>
+                                        <th>Entry</th>
+                                        <th>Stop Loss</th>
+                                        <th>Target</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Data will be loaded via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section class="data-table-section glass">
+                        <h3>Portfolio Holdings</h3>
+                        <div class="table-container">
+                            <table id="portfolio-table">
+                                <thead>
+                                    <tr>
+                                        <th>Symbol</th>
+                                        <th>Qty</th>
+                                        <th>Avg Price</th>
+                                        <th>P&L</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Data will be loaded via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Portfolio View -->
+            <div id="portfolio-view" class="tab-content">
+                <section class="data-table-section glass">
+                    <h3>Portfolio Details</h3>
+                    <div class="table-container">
+                        <table id="portfolio-table-dedicated">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Quantity</th>
+                                    <th>Avg. Price</th>
+                                    <th>P&L</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Orders View -->
+            <div id="orders-view" class="tab-content">
+                <section class="data-table-section glass">
+                    <h3>Order History</h3>
+                    <div class="table-container">
+                        <table id="orders-table">
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Symbol</th>
+                                    <th>Side</th>
+                                    <th>Status</th>
+                                    <th>Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- AI Models View -->
+            <div id="models-view" class="tab-content">
+                <section class="glass">
+                    <h3>AI Model Management</h3>
+                    <p class="metric-label" style="margin-top: 20px;">Current Model: XGBoost Baseline</p>
+                    <div class="report-grid" style="margin-top: 20px;">
+                        <div class="report-card">
+                            <p class="report-label">ACCURACY</p>
+                            <p class="report-value">51%</p>
+                        </div>
+                        <div class="report-card">
+                            <p class="report-label">FEATURES</p>
+                            <p class="report-value">19</p>
+                        </div>
+                    </div>
+                    <button class="btn-sm active" style="margin-top: 30px; padding: 12px 24px;"
+                        onclick="retrainModel()">🔄 Retrain Model</button>
+                </section>
+            </div>
+
+            <!-- Settings View -->
+            <div id="settings-view" class="tab-content">
+                <section class="glass">
+                    <h3>General Settings</h3>
+                    <div class="settings-form" style="margin-top: 25px; display: grid; gap: 20px;">
+                        <div>
+                            <label class="metric-label">Active Data Source / Execution Broker</label>
+                            <select id="broker-selector" class="glass-input" onchange="handleBrokerSwitch(this.value)">
+                                <option value="indstocks">Indstocks</option>
+                                <option value="kotak">Kotak Neo</option>
+                            </select>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <label class="metric-label">Max Daily Loss (%)</label>
+                            <input type="number" value="2.0" class="glass-input">
+                        </div>
+                        <button class="btn-sm active" style="width: fit-content; padding: 10px 30px;">Save All
+                            Settings</button>
+                    </div>
+                </section>
+            </div>
+
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Data & Models
+data/raw/
+data/processed/
+src/models/saved_models/*.json
+src/models/saved_models/*.joblib
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# IDEs
+.vscode/
+.idea/
+
+# Distribution / Repos
+dist/
+build/
+*.egg-info/
