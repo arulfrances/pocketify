@@ -6,14 +6,14 @@ from dotenv import load_dotenv
 project_root = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(project_root)
 
-from src.execution.broker_gateway import KotakNeoGateway, PaytmMoneyGateway, IndstocksGateway
+from src.execution.brokers import KotakNeoGateway, PaytmMoneyGateway, IndstocksGateway, AngelOneGateway
 from src.execution.live_strategy import LiveStrategyRunner
 
 load_dotenv()
 
 def start_trading(broker_name="kotak"):
     print(f"--- Starting Prostock with {broker_name} ---")
-    
+
     # Initialize the chosen broker with credentials from .env
     if broker_name.lower() == "kotak":
         broker = KotakNeoGateway(
@@ -33,6 +33,13 @@ def start_trading(broker_name="kotak"):
             api_key=os.getenv("IND_API_KEY", "dummy"),
             access_token=os.getenv("IND_ACCESS_TOKEN", "dummy")
         )
+    elif broker_name.lower() == "angelone":
+        broker = AngelOneGateway(
+            api_key=os.getenv("ANGELONE_API_KEY", "dummy"),
+            client_code=os.getenv("ANGELONE_CLIENT_CODE", "dummy"),
+            password=os.getenv("ANGELONE_PASSWORD", "dummy"),
+            totp_secret=os.getenv("ANGELONE_TOTP_SECRET", "")
+        )
     else:
         print("Invalid broker selected.")
         return
@@ -45,6 +52,6 @@ def start_trading(broker_name="kotak"):
     runner.run_mock_stream(duration_seconds=30)
 
 if __name__ == "__main__":
-    # Change this to 'paytm' or 'indstocks' to switch brokers
-    selected_broker = "kotak" 
+    # Change this to 'paytm', 'indstocks', or 'angelone' to switch brokers
+    selected_broker = "kotak"
     start_trading(selected_broker)

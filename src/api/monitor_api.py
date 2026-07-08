@@ -1,20 +1,24 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 import pandas as pd
 import os
 import sys
+import secrets
 
 # Add project root to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from src.execution.broker_gateway import IndstocksGateway, KotakNeoGateway
+from src.execution.brokers import IndstocksGateway, KotakNeoGateway, AngelOneGateway
 from src.ingestion.nse_downloader import NSEDownloader
 from src.features.feature_engineer import FeatureEngineer
 from src.models.trainer import ModelTrainer
 from src.backtest.engine import BacktestEngine
 from src.execution.risk_manager import RiskManager
 from src.utils.market_status import is_market_open
+from src.services import prediction_service
+from src.notifications.telegram_notifier import TelegramNotifier
 
 app = FastAPI(title="Prostock Market API")
 
@@ -24,6 +28,7 @@ fe = FeatureEngineer()
 trainer = ModelTrainer()
 backtester = BacktestEngine()
 risk_manager = RiskManager()
+telegram = TelegramNotifier()
 
 # Defaults & Caching
 INDEX_CACHE = {
@@ -37,11 +42,17 @@ BROKER_CONTEXT = {
     "brokers": {
         "indstocks": IndstocksGateway(os.getenv("IND_API_KEY", "key"), os.getenv("IND_ACCESS_TOKEN", "token")),
         "kotak": KotakNeoGateway(
-            os.getenv("KOTAK_API_KEY", "key"), 
+            os.getenv("KOTAK_API_KEY", "key"),
             os.getenv("KOTAK_ACCESS_TOKEN", "token"),
             os.getenv("KOTAK_CONSUMER_SECRET", "secret"),
             os.getenv("KOTAK_PHONE", "999"),
             os.getenv("KOTAK_MPIN", "1234")
+        ),
+        "angelone": AngelOneGateway(
+            os.getenv("ANGELONE_API_KEY", "key"),
+            os.getenv("ANGELONE_CLIENT_CODE", "client"),
+            os.getenv("ANGELONE_PASSWORD", "password"),
+            os.getenv("ANGELONE_TOTP_SECRET", "")
         )
     }
 }
@@ -51,39 +62,9 @@ def read_root():
     return {"status": "Prostock Engine is Running"}
 
 @app.get("/api/predictions")
-def get_latest_predictions():
+def get_latest_predictions(symbol: str = "NIFTY 50"):
     try:
-        # 1. Fetch latest data (last 100 days to calculate technical indicators)
-        df = downloader.download_index_data("NIFTY 50", start_date=(pd.Timestamp.now() - pd.Timedelta(days=100)).strftime('%Y-%m-%d'))
-        
-        if df is None or df.empty:
-            return {"status": "error", "message": "Failed to fetch market data"}
-            
-        # 2. Engineer features
-        df_features = fe.add_technical_indicators(df)
-        
-        # 3. Get prediction
-        feature_cols = [col for col in df_features.columns if col not in ['Target', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume']]
-        prediction = trainer.predict_latest(df_features, feature_cols)
-        
-        if prediction:
-            current_price = float(df['Close'].iloc[-1])
-            atr = float(df_features['ATR'].iloc[-1])
-            
-            sl, target = risk_manager.calculate_levels(current_price, atr, side=prediction["signal"])
-            
-            return {
-                "symbol": "NIFTY 50",
-                "price": current_price,
-                "signal": prediction["signal"],
-                "confidence": prediction["confidence"],
-                "stop_loss": sl,
-                "target": target,
-                "timestamp": pd.Timestamp.now().isoformat()
-            }
-        else:
-            return {"status": "error", "message": "Model not trained yet. Run main_pipeline.py first."}
-            
+        return prediction_service.get_signal(symbol)
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -189,12 +170,51 @@ def get_orders():
 @app.get("/api/search")
 def search_symbol(query: str):
     """
-    Simple search simulation. 
+    Simple search simulation.
     In reality, this would search a ticker list or call a broker API.
     """
     valid_indices = ["NIFTY 50", "BANKNIFTY", "SENSEX"]
     results = [idx for idx in valid_indices if query.upper() in idx.upper()]
     return {"query": query, "results": results}
+
+class WebhookSignal(BaseModel):
+    secret: str
+    symbol: str
+    action: str  # BUY/SELL
+    quantity: int = 1
+    strategy: str = "external"
+    stop_loss: float | None = None
+    target: float | None = None
+
+@app.post("/api/webhook/signal")
+def webhook_signal(payload: WebhookSignal):
+    """
+    Accepts externally generated strategy signals (e.g. a TradingView alert),
+    similar to openalgo's webhook-driven execution model.
+    Routes the signal to the currently active broker and notifies Telegram.
+    """
+    expected_secret = os.getenv("WEBHOOK_SECRET", "")
+    if not expected_secret or not secrets.compare_digest(payload.secret, expected_secret):
+        raise HTTPException(status_code=401, detail="Invalid or missing webhook secret")
+
+    active_key = BROKER_CONTEXT["active"]
+    broker = BROKER_CONTEXT["brokers"][active_key]
+
+    order_result = broker.place_order(
+        symbol=payload.symbol,
+        transaction_type=payload.action.upper(),
+        quantity=payload.quantity,
+        stop_loss=payload.stop_loss,
+        target=payload.target,
+    )
+
+    telegram.send_message(
+        f"\U0001F4E1 Webhook signal from *{payload.strategy}*: "
+        f"{payload.action.upper()} {payload.quantity} {payload.symbol}\n"
+        f"Broker: {active_key}\nResult: {order_result.get('status')}"
+    )
+
+    return {"status": "success", "broker": active_key, "order_result": order_result}
 
 # Serve Static Files
 static_path = os.path.join(os.path.dirname(__file__), "static")

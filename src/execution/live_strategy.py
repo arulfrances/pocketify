@@ -9,7 +9,7 @@ import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from src.features.feature_engineer import FeatureEngineer
-from src.execution.broker_gateway import ZerodhaKiteGateway
+from src.execution.brokers import ZerodhaKiteGateway
 
 class LiveStrategyRunner:
     def __init__(self, broker_gateway, symbol="NIFTY 50"):

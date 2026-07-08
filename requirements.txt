@@ -12,8 +12,8 @@ python-dotenv
 yfinance
 plotly
 matplotlib
-paytmmoney-python-sdk
 pyotp
+pytz
 gunicorn
-uvicorn
 # neo-api-client (Install via: pip install neo-api-client)
+# paytmmoney-python-sdk (not on PyPI; install from broker docs if/when needed)
