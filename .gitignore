@@ -18,6 +18,7 @@ data/raw/
 data/processed/
 src/models/saved_models/*.json
 src/models/saved_models/*.joblib
+signal_state.json
 
 # Jupyter Notebooks
 .ipynb_checkpoints
