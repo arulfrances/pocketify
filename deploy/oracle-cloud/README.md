@@ -19,20 +19,42 @@ services with no cold starts and no sleep-on-idle.
 
 In the OCI Console: **Compute -> Instances -> Create Instance**
 
-- **Name**: `pocketify`
+Two Always Free-eligible paths - pick one (the console labels the eligible
+option "Always Free-eligible" directly under the shape, which is the
+authoritative confirmation, since Oracle has changed these numbers before):
+
+**Option A - Ampere A1.Flex (more headroom, recommended if available)**
 - **Image**: Canonical Ubuntu 22.04 (or 24.04)
-- **Shape**: click "Change shape" -> Ampere -> **VM.Standard.A1.Flex** -> set
-  2 OCPU / 12 GB memory (the Always Free allowance is up to 4 OCPU / 24GB
-  total, shareable across instances). If A1 capacity is unavailable in your
-  region, `VM.Standard.E2.1.Micro` (AMD, always free, 1 OCPU/1GB) also works,
-  just less headroom for the ML model.
+- **Shape**: "Change shape" -> Ampere -> `VM.Standard.A1.Flex` -> set
+  **2 OCPU / 12 GB memory**. As of June 2026 Oracle halved this tier's total
+  Always Free allowance from 4 OCPU/24GB to **2 OCPU/12GB total** - so this
+  configuration uses the *entire* free allowance; don't create a second A1
+  instance on top of it. If A1 capacity is unavailable in your region, use
+  Option B.
+- Use `setup.sh` (below) after creation.
+
+**Option B - E2.1.Micro (always available, less headroom)**
+- **Image**: Oracle Linux 9 (or Ubuntu, if you prefer - just match the script)
+- **Shape**: `VM.Standard.E2.1.Micro` - 1 OCPU / 1 GB RAM, "Always
+  Free-eligible". You can run up to 2 of these free.
+- 1GB RAM is tight for pandas/xgboost/scikit-learn running alongside nginx -
+  use `cloud-init-oraclelinux9.sh` (below), which adds a 2GB swap file.
+
+For either option:
 - **Networking**: keep the default VCN, and make sure "Assign a public IPv4
-  address" is checked.
+  address" is checked (leave it as ephemeral, not reserved - simpler and free).
 - **Add SSH keys**: generate a keypair if you don't have one:
   ```bash
   ssh-keygen -t ed25519 -f ~/.ssh/pocketify_oci
   ```
   Paste the contents of `~/.ssh/pocketify_oci.pub` into the console.
+- Leave the boot volume at its default size (~50GB) - Always Free includes
+  200GB of combined block storage, so the default is well within budget.
+- **Optional shortcut for Option B**: paste the full contents of
+  `cloud-init-oraclelinux9.sh` into the "Paste cloud-init script" field
+  during creation - it runs automatically on first boot and does everything
+  in steps 4-5 below for you, except the two manual steps it prints at the
+  end (VCN firewall rule + real credentials).
 - Click **Create**. Note the public IP once it's running.
 
 ## 3. Open the firewall (the most common Oracle Cloud gotcha)
@@ -42,14 +64,18 @@ OCI blocks traffic in two places - you must open **both**:
 1. **VCN Security List** (console): Networking -> Virtual Cloud Networks ->
    your VCN -> Security Lists -> Default Security List -> Add Ingress Rules:
    - Source CIDR `0.0.0.0/0`, IP Protocol TCP, Destination Port `80`
-2. **Host firewall (ufw)**: handled automatically by `setup.sh` below.
+2. **Host firewall**: handled automatically by `setup.sh` (ufw, Ubuntu) or
+   `cloud-init-oraclelinux9.sh` (firewalld, Oracle Linux) below.
 
 Skipping step 1 is the #1 reason people can't reach their OCI web server.
 
 ## 4. Deploy the app
 
-SSH into the instance and run the setup script:
+If you used the cloud-init paste option for Option B, this already happened
+at first boot - skip to step 5. Otherwise, SSH in and run the setup script
+that matches your image:
 
+**Ubuntu (Option A or a Ubuntu-based Option B):**
 ```bash
 ssh -i ~/.ssh/pocketify_oci ubuntu@<your-vm-public-ip>
 curl -fsSL https://raw.githubusercontent.com/arulfrances/pocketify/main/deploy/oracle-cloud/setup.sh -o setup.sh
@@ -57,9 +83,19 @@ chmod +x setup.sh
 sudo ./setup.sh
 ```
 
-This installs Python/nginx, clones the repo to `/opt/pocketify`, creates a
-venv, installs dependencies, and sets up two systemd services
+**Oracle Linux 9 (Option B), if you didn't use the cloud-init paste:**
+```bash
+ssh -i ~/.ssh/pocketify_oci opc@<your-vm-public-ip>
+curl -fsSL https://raw.githubusercontent.com/arulfrances/pocketify/main/deploy/oracle-cloud/cloud-init-oraclelinux9.sh -o setup.sh
+chmod +x setup.sh
+sudo ./setup.sh
+```
+
+Either script installs Python/nginx, clones the repo to `/opt/pocketify`,
+creates a venv, installs dependencies, and sets up two systemd services
 (`pocketify-api`, `pocketify-bot`) plus an nginx reverse proxy on port 80.
+The Oracle Linux variant also adds a 2GB swap file and configures
+firewalld/SELinux instead of ufw.
 
 ## 5. Add real credentials and train the model
 
