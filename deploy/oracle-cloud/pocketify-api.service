@@ -1,0 +1,16 @@
+[Unit]
+Description=Pocketify FastAPI dashboard/API
+After=network.target
+
+[Service]
+Type=simple
+User=pocketify
+Group=pocketify
+WorkingDirectory=/opt/pocketify
+EnvironmentFile=/opt/pocketify/.env
+ExecStart=/opt/pocketify/venv/bin/gunicorn -w 2 -k uvicorn.workers.UvicornWorker src.api.monitor_api:app --bind 127.0.0.1:8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -43,6 +43,12 @@ All broker adapters currently return simulated responses for the live HTTP calls
 2. Message your bot once, then get your chat id (e.g. via [@userinfobot](https://t.me/userinfobot)) and set `TELEGRAM_CHAT_ID`.
 3. Run `python main_pipeline.py` once to train the model.
 4. Run `python signal_alert_bot.py` - it polls Nifty 50, Bank Nifty and Sensex on an interval (`SIGNAL_POLL_INTERVAL`, default 300s) during market hours and sends a Telegram message whenever a symbol's signal flips between BUY and SELL.
+5. Alternatively, `.github/workflows/signal-alerts.yml` runs the same bot on a schedule via GitHub Actions (free for public repos) - just add `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` as repo secrets, no server required.
+
+## Deployment
+
+- **Dashboard/API only, easiest**: deploy to [Render](https://render.com)'s free web service tier - it auto-detects the `Procfile`. Free tier sleeps after ~15 min idle.
+- **Always-on (dashboard + bot, never sleeps)**: see [`deploy/oracle-cloud/README.md`](deploy/oracle-cloud/README.md) for a full walkthrough of running both as systemd services on an Oracle Cloud Always Free VM, including a one-command `setup.sh`.
 
 ## Webhook-Triggered Strategies
 
