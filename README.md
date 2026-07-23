@@ -47,8 +47,21 @@ All broker adapters currently return simulated responses for the live HTTP calls
 
 ## Deployment
 
-- **Dashboard/API only, easiest**: deploy to [Render](https://render.com)'s free web service tier - it auto-detects the `Procfile`. Free tier sleeps after ~15 min idle.
-- **Always-on (dashboard + bot, never sleeps)**: see [`deploy/oracle-cloud/README.md`](deploy/oracle-cloud/README.md) for a full walkthrough of running both as systemd services on an Oracle Cloud Always Free VM, including a one-command `setup.sh`.
+### Render (recommended - no credit card, zero billing surface)
+
+1. Go to [render.com](https://render.com), sign up (no card required for the free tier), and connect your GitHub account.
+2. Click **New +** -> **Blueprint** -> select the `pocketify` repo. Render reads `render.yaml` in this repo automatically and pre-fills the service (name, build command, start command, free plan) - no manual configuration needed.
+3. On the "Environment Variables" step, Render prompts for each secret declared in `render.yaml` (`TELEGRAM_BOT_TOKEN`, broker keys, `WEBHOOK_SECRET`, etc.) - fill in whichever you actually have; leave the rest blank for now.
+4. Click **Apply**. You'll get a public `https://pocketify-xxxx.onrender.com` URL once the build finishes (a few minutes).
+5. The signal alert bot runs separately and for free via `.github/workflows/signal-alerts.yml` (GitHub Actions) - add `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` as repo secrets there too (Settings -> Secrets and variables -> Actions).
+
+Free tier sleeps after ~15 min idle (30-60s cold start on the next visit) - fine for a personal dashboard, and there is no paid dimension in the free plan for this to accidentally cross into.
+
+If you'd rather configure it manually instead of using the Blueprint: New + -> Web Service -> connect the repo -> build command `pip install -r requirements.txt` -> start command matches the `Procfile`.
+
+### Oracle Cloud Always Free (always-on, more setup)
+
+See [`deploy/oracle-cloud/README.md`](deploy/oracle-cloud/README.md) for running both the dashboard and the bot as systemd services on an Oracle Cloud Always Free VM - never sleeps, but requires a card for identity verification and more console configuration.
 
 ## Webhook-Triggered Strategies
 
