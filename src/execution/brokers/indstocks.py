@@ -40,21 +40,27 @@ class IndstocksGateway(BrokerGateway):
         except Exception as e:
             self.logger.error(f"Error fetching instruments: {e}")
 
+    def _resolve_security_id(self, symbol, segment):
+        security_id = self.instruments_cache.get(symbol)
+        if not security_id:
+            self.fetch_instruments(segment.lower())
+            security_id = self.instruments_cache.get(symbol)
+        return security_id
+
     def place_order(self, symbol, transaction_type, quantity, order_type="MARKET", product="CNC", segment="EQUITY", stop_loss=None, target=None):
         # Risk Management Check
         if not self.risk_manager.validate_order({"stop_loss": stop_loss, "target": target}):
             return {"status": "error", "message": "Order rejected by Risk Manager: Missing SL/Target"}
 
-        # Retrieve security_id from cache
-        security_id = self.instruments_cache.get(symbol)
-        if not security_id:
-            # Try to fetch if cache is empty
-            self.fetch_instruments(segment.lower())
-            security_id = self.instruments_cache.get(symbol)
-
+        security_id = self._resolve_security_id(symbol, segment)
         if not security_id:
             self.logger.error(f"Security ID not found for symbol: {symbol}")
             return {"status": "error", "message": f"Symbol {symbol} not found in instrument master"}
+
+        # If both legs are present, place a real broker-enforced OCO (GTT) order
+        # instead of a plain order, so SL/target survive even if this app goes down.
+        if stop_loss is not None and target is not None:
+            return self._place_smart_order(symbol, transaction_type, quantity, order_type, product, segment, security_id, stop_loss, target)
 
         url = f"{self.base_url}/order"
         headers = {
@@ -82,6 +88,80 @@ class IndstocksGateway(BrokerGateway):
 
         return {"status": "success", "broker": "Indstocks", "order_id": "IND_SIM_123"}
 
+    def _place_smart_order(self, symbol, transaction_type, quantity, order_type, product, segment, security_id, stop_loss, target):
+        """
+        Places a parent order with linked SL + target child legs via the
+        Smart Orders (GTT) API, so the exit is enforced broker-side (OCO:
+        whichever leg triggers first cancels the other) rather than only
+        being tracked in this app's RiskManager.
+        """
+        url = f"{self.base_url}/smart/order"
+        headers = {
+            "Authorization": self.access_token,
+            "Content-Type": "application/json"
+        }
+
+        payload = {
+            "txn_type": transaction_type.upper(),
+            "exchange": "NSE",
+            "segment": segment.upper(),
+            "product": product.upper(),
+            "order_type": order_type.upper(),
+            "security_id": str(security_id),
+            "qty": int(quantity),
+            "algo_id": "99999",
+            "sl_trigger_price": stop_loss,
+            "sl_limit_price": stop_loss,
+            "tgt_trigger_price": target,
+            "tgt_limit_price": target,
+        }
+
+        self.logger.info(f"Indstocks: Placing {transaction_type} {quantity} {symbol} with SL={stop_loss} target={target} (smart order)")
+        # In actual use:
+        # response = requests.post(url, headers=headers, json=payload)
+        # return response.json()
+
+        return {
+            "status": "success",
+            "broker": "Indstocks",
+            "order_id": "IND_SMART_SIM_123",
+            "child_order_details": {"order_id": "IND_GTT_SIM_456", "order_status": "CREATED"}
+        }
+
+    def modify_order(self, order_id, segment, qty=None, limit_price=None):
+        """
+        Modifies a pending order's quantity and/or limit price.
+        """
+        url = f"{self.base_url}/order/modify"
+        headers = {"Authorization": self.access_token, "Content-Type": "application/json"}
+        payload = {"order_id": order_id, "segment": segment.upper()}
+        if qty is not None:
+            payload["qty"] = int(qty)
+        if limit_price is not None:
+            payload["limit_price"] = limit_price
+
+        self.logger.info(f"Indstocks: Modifying order {order_id}")
+        # In actual use:
+        # response = requests.post(url, headers=headers, json=payload)
+        # return response.json()
+
+        return {"status": "success", "order_id": order_id, "order_status": "MODIFIED"}
+
+    def cancel_order(self, order_id, segment):
+        """
+        Cancels a pending order.
+        """
+        url = f"{self.base_url}/order/cancel"
+        headers = {"Authorization": self.access_token, "Content-Type": "application/json"}
+        payload = {"order_id": order_id, "segment": segment.upper()}
+
+        self.logger.info(f"Indstocks: Cancelling order {order_id}")
+        # In actual use:
+        # response = requests.post(url, headers=headers, json=payload)
+        # return response.json()
+
+        return {"status": "success", "order_id": order_id, "order_status": "CANCELLED"}
+
     def get_order_status(self, order_id):
         """
         Fetches the status of a specific order.
@@ -105,9 +185,9 @@ class IndstocksGateway(BrokerGateway):
 
     def get_orders(self):
         """
-        Fetches all recent orders.
+        Fetches all recent orders (order book).
         """
-        url = f"{self.base_url}/orders"
+        url = f"{self.base_url}/order-book"
         headers = {"Authorization": self.access_token}
 
         # In actual use:
@@ -121,7 +201,7 @@ class IndstocksGateway(BrokerGateway):
 
     def get_portfolio(self):
         """
-        Fetches current holdings/portfolio.
+        Fetches current holdings.
         """
         url = f"{self.base_url}/portfolio/holdings"
         headers = {"Authorization": self.access_token}
@@ -137,3 +217,37 @@ class IndstocksGateway(BrokerGateway):
                 {"symbol": "TCS", "qty": 5, "avg_price": 3200.0, "current_price": 3150.0, "pnl": -250.0}
             ]
         }
+
+    def get_positions(self, segment=None, product=None):
+        """
+        Fetches open derivative/equity positions (distinct from holdings).
+        """
+        url = f"{self.base_url}/portfolio/positions"
+        headers = {"Authorization": self.access_token}
+        params = {}
+        if segment:
+            params["segment"] = segment.lower()
+        if product:
+            params["product"] = product.lower()
+
+        # In actual use:
+        # response = requests.get(url, headers=headers, params=params)
+        # return response.json()
+
+        return {"status": "success", "data": {"net_positions": [], "day_positions": []}}
+
+    def get_quote(self, symbols, mode="ltp"):
+        """
+        Fetches market quotes. mode: 'ltp', 'full', or 'mkt' (depth).
+        symbols: list of 'SEGMENT_TOKEN' strings, e.g. ['NSE_3045'], up to 1000 per call.
+        """
+        endpoint = {"ltp": "ltp", "full": "full", "mkt": "mkt"}.get(mode, "ltp")
+        url = f"{self.base_url}/market/quotes/{endpoint}"
+        headers = {"Authorization": self.access_token}
+        params = {"scrip-codes": ",".join(symbols)}
+
+        # In actual use:
+        # response = requests.get(url, headers=headers, params=params)
+        # return response.json()
+
+        return {"status": "success", "data": {s: {"live_price": 0.0} for s in symbols}}
